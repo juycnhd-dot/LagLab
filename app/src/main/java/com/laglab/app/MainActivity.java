@@ -6,9 +6,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.drawable.Drawable;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -95,21 +98,40 @@ public class MainActivity extends Activity {
 
     private void pickApps() {
         PackageManager pm = getPackageManager();
-        TreeMap<String, String> found = new TreeMap<>(); // "label\npackage" -> package
+        TreeMap<String, ResolveInfo> found = new TreeMap<>(); // "label\npackage" -> app
         Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         for (ResolveInfo r : pm.queryIntentActivities(q, 0)) {
             String pkg = r.activityInfo.packageName;
-            if (!pkg.equals(getPackageName())) found.put(r.loadLabel(pm) + "\n" + pkg, pkg);
+            if (!pkg.equals(getPackageName())) found.put(r.loadLabel(pm) + "\n" + pkg, r);
         }
         String[] labels = found.keySet().toArray(new String[0]);
-        String[] pkgs = found.values().toArray(new String[0]);
+        String[] pkgs = new String[labels.length];
+        Drawable[] icons = new Drawable[labels.length];
+        int size = (int) (40 * getResources().getDisplayMetrics().density);
+        for (int i = 0; i < labels.length; i++) {
+            ResolveInfo r = found.get(labels[i]);
+            pkgs[i] = r.activityInfo.packageName;
+            icons[i] = r.loadIcon(pm);
+            icons[i].setBounds(0, 0, size, size);
+        }
         selected.retainAll(Arrays.asList(pkgs)); // forget uninstalled apps
-        boolean[] checked = new boolean[pkgs.length];
-        for (int i = 0; i < pkgs.length; i++) checked[i] = selected.contains(pkgs[i]);
+
+        ListView list = new ListView(this);
+        list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        list.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, labels) {
+            @Override public View getView(int position, View old, ViewGroup parent) {
+                CheckedTextView row = (CheckedTextView) super.getView(position, old, parent);
+                row.setCompoundDrawables(icons[position], null, null, null);
+                row.setCompoundDrawablePadding(size / 3);
+                return row;
+            }
+        });
+        for (int i = 0; i < pkgs.length; i++) list.setItemChecked(i, selected.contains(pkgs[i]));
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            if (list.isItemChecked(position)) selected.add(pkgs[position]); else selected.remove(pkgs[position]);
+        });
         new AlertDialog.Builder(this)
-                .setMultiChoiceItems(labels, checked, (d, i, on) -> {
-                    if (on) selected.add(pkgs[i]); else selected.remove(pkgs[i]);
-                })
+                .setView(list)
                 .setPositiveButton("ঠিক আছে", null)
                 .setOnDismissListener(d -> {
                     prefs.edit().putStringSet("apps", new HashSet<>(selected)).apply();
