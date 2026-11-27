@@ -6,7 +6,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,10 +20,12 @@ import java.net.Socket;
 import java.util.*;
 
 public class MainActivity extends Activity {
+    private static final int BG = 0xFF0F1216, CARD = 0xFF1B2027, SOFT = 0xFF2B323C,
+            ACCENT = 0xFF2E9E6E, RED = 0xFFD9534F, WHITE = 0xFFFFFFFF, GREY = 0xFF9AA4B2;
     private final HashSet<String> selected = new HashSet<>();
     private SharedPreferences prefs;
     private SeekBar delay, loss;
-    private CheckBox block;
+    private Switch block;
     private Button apps, toggle;
     private TextView pingResult;
 
@@ -36,22 +40,33 @@ public class MainActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
         root.setFitsSystemWindows(true);
 
-        text(root, "পিং টেস্ট", 20);
+        text(root, "LagLab", 30);
+        text(root, "পিং ও নেটওয়ার্ক টেস্ট", 14);
+
+        LinearLayout pingCard = card(root);
+        text(pingCard, "পিং টেস্ট", 18);
         EditText host = new EditText(this);
         host.setSingleLine();
         host.setText("google.com");
-        root.addView(host);
-        Button ping = button(root, "পিং মাপুন");
-        pingResult = text(root, "", 16);
+        host.setTextColor(WHITE);
+        host.setBackgroundTintList(ColorStateList.valueOf(ACCENT));
+        pingCard.addView(host);
+        Button ping = button(pingCard, "পিং মাপুন");
+        pingResult = text(pingCard, "", 16);
         ping.setOnClickListener(v -> ping(host.getText().toString().trim()));
 
-        text(root, "খারাপ নেটওয়ার্ক", 20);
-        delay = slider(root, "দেরি (প্রতি দিকে)", " ms", 2000, "delay");
-        loss = slider(root, "প্যাকেট লস", " %", 100, "loss");
-        block = new CheckBox(this);
+        LinearLayout netCard = card(root);
+        text(netCard, "খারাপ নেটওয়ার্ক", 18);
+        delay = slider(netCard, "দেরি (প্রতি দিকে)", " ms", 2000, "delay");
+        loss = slider(netCard, "প্যাকেট লস", " %", 100, "loss");
+        block = new Switch(this);
         block.setText("পুরো ব্লক");
-        root.addView(block);
+        block.setTextColor(WHITE);
+        block.setPadding(0, dp(12), 0, dp(4));
+        netCard.addView(block);
+
         apps = button(root, "");
+        apps.setBackground(shape(SOFT));
         apps.setOnClickListener(v -> pickApps());
         toggle = button(root, "");
         toggle.setOnClickListener(v -> {
@@ -69,6 +84,10 @@ public class MainActivity extends Activity {
         text(root, "মান বদলালে বন্ধ করে আবার চালু করুন।", 13);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(BG);
+        scroll.setFillViewport(true);
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
         scroll.addView(root);
         setContentView(scroll);
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 2);
@@ -94,6 +113,7 @@ public class MainActivity extends Activity {
     private void refresh() {
         apps.setText("অ্যাপ বাছাই (" + selected.size() + ")");
         toggle.setText(LagService.active ? "বন্ধ করুন" : "চালু করুন");
+        toggle.setBackground(shape(LagService.active ? RED : ACCENT));
     }
 
     private void pickApps() {
@@ -163,10 +183,33 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density);
+    }
+
+    private GradientDrawable shape(int color) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(14));
+        return g;
+    }
+
+    private LinearLayout card(LinearLayout root) {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(16), dp(12), dp(16), dp(16));
+        c.setBackground(shape(CARD));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.topMargin = dp(14);
+        root.addView(c, p);
+        return c;
+    }
+
     private TextView text(LinearLayout root, String s, int size) {
         TextView t = new TextView(this);
         t.setText(s);
         t.setTextSize(size);
+        t.setTextColor(size >= 18 ? WHITE : GREY);
         t.setPadding(0, 16, 0, 8);
         root.addView(t);
         return t;
@@ -175,7 +218,14 @@ public class MainActivity extends Activity {
     private Button button(LinearLayout root, String s) {
         Button b = new Button(this);
         b.setText(s);
-        root.addView(b);
+        b.setAllCaps(false);
+        b.setTextSize(16);
+        b.setTextColor(WHITE);
+        b.setBackground(shape(ACCENT));
+        b.setStateListAnimator(null);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(52));
+        p.topMargin = dp(12);
+        root.addView(b, p);
         return b;
     }
 
@@ -183,6 +233,8 @@ public class MainActivity extends Activity {
         TextView label = text(root, "", 15);
         SeekBar bar = new SeekBar(this);
         bar.setMax(max);
+        bar.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        bar.setThumbTintList(ColorStateList.valueOf(ACCENT));
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar s, int v, boolean user) { label.setText(name + ": " + v + unit); }
             public void onStartTrackingTouch(SeekBar s) { }
